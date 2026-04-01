@@ -1,6 +1,4 @@
-"""
-Data Preview Script - Check your CSV files
-"""
+
 import pandas as pd
 import os
 from pathlib import Path

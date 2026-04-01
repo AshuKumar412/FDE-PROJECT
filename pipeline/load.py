@@ -1,7 +1,4 @@
-"""
-Data Loading Module
-Handles database operations
-"""
+
 import sqlite3
 import pandas as pd
 import os

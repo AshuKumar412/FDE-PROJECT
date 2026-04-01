@@ -1,6 +1,3 @@
-"""
-Healthcare Data Pipeline Module
-"""
 
 from .extract import extract_all_data
 from .transform import transform_all_data

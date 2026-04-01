@@ -1,7 +1,4 @@
-"""
-Data Extraction Module
-Handles reading CSV files from the data directory
-"""
+
 import pandas as pd
 import os
 from pathlib import Path
