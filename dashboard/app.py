@@ -6,6 +6,8 @@ from datetime import datetime
 import sys
 import os
 
+import subprocess
+
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pipeline.load import query_database
@@ -164,6 +166,18 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+def ensure_data():
+    db_path = "database/healthcare.db"
+    
+    if not os.path.exists(db_path):
+        st.warning("⚠️ No database found. Running pipeline...")
+        try:
+            subprocess.run(["python", "main.py"], check=True)
+            st.success("✅ Data pipeline executed successfully!")
+        except Exception as e:
+            st.error(f"❌ Pipeline failed: {e}")
+
 
 @st.cache_data(ttl=3600)
 def load_data():
