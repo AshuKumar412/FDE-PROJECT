@@ -1,772 +1,618 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from datetime import datetime
-import sys
-import os
+import sys, os, subprocess
 
-import subprocess
-
-# Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pipeline.load import query_database
 
-# Page configuration
 st.set_page_config(
-    page_title="Healthcare Analytics Dashboard",
-    page_icon="🏥",
+    page_title="Medic · Analytics",
+    page_icon="⬡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# ─────────────────────────────────────────────────────────────────────────────
+# GLOBAL CSS  (static only — zero dynamic values injected here)
+# This is the only place we use class names. Dynamic HTML always uses inline styles.
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Main header styling */
-    .main-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem;
-        border-radius: 20px;
-        margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    .main-header h1 {
-        color: white;
-        font-size: 2.5rem;
-        margin: 0;
-        font-weight: 600;
-    }
-    .main-header p {
-        color: rgba(255,255,255,0.9);
-        font-size: 1.1rem;
-        margin-top: 0.5rem;
-    }
-    
-    /* KPI Cards */
-    .kpi-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1.2rem;
-        border-radius: 15px;
-        color: white;
-        text-align: center;
-        margin: 0.5rem;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-    }
-    .kpi-card:hover {
-        transform: translateY(-5px);
-    }
-    .kpi-value {
-        font-size: 2rem;
-        font-weight: bold;
-        margin: 0.5rem 0;
-    }
-    .kpi-label {
-        font-size: 0.9rem;
-        opacity: 0.9;
-    }
-    .kpi-icon {
-        font-size: 1.5rem;
-    }
-    
-    /* Chart containers */
-    .chart-container {
-        background: white;
-        border-radius: 15px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        border: 1px solid #e0e0e0;
-    }
-    
-    /* Sidebar styling */
-    .sidebar-header {
-        text-align: center;
-        padding: 1rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 15px;
-        margin-bottom: 1rem;
-        color: white;
-    }
-    .sidebar-header h3 {
-        margin: 0.5rem 0;
-    }
-    
-    /* Insights box */
-    .insight-box {
-        background: #f8f9fa;
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-left: 4px solid #667eea;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    
-    /* Metric cards */
-    .metric-card {
-        background: white;
-        border-radius: 10px;
-        padding: 0.8rem;
-        text-align: center;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        border: 1px solid #e0e0e0;
-    }
-    
-    /* Progress bar */
-    .progress-container {
-        background: rgba(102,126,234,0.2);
-        border-radius: 10px;
-        padding: 0.2rem;
-        margin: 0.5rem 0;
-    }
-    .progress-bar {
-        background: linear-gradient(90deg, #667eea, #764ba2);
-        border-radius: 10px;
-        padding: 0.3rem;
-        text-align: center;
-        color: white;
-        font-size: 0.8rem;
-    }
-    
-    /* Footer */
-    .footer {
-        text-align: center;
-        padding: 1.5rem;
-        margin-top: 2rem;
-        border-top: 1px solid #e0e0e0;
-        color: #666;
-    }
-    
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-        transform: translateY(-2px);
-    }
-    
-    /* Selectbox styling */
-    .stSelectbox > div > div {
-        border-radius: 8px;
-        border: 1px solid #e0e0e0;
-    }
-    
-    /* Info message */
-    .stAlert {
-        border-radius: 10px;
-        border-left: 4px solid #667eea;
-    }
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif !important;
+    background-color: #0a0d12 !important;
+    color: #edf2f7 !important;
+}
+.main .block-container { padding: 2rem 2.5rem 3rem !important; max-width: 1400px; }
+
+[data-testid="stSidebar"] {
+    background: #111520 !important;
+    border-right: 1px solid rgba(255,255,255,0.06) !important;
+}
+[data-testid="stSidebar"] * { color: #edf2f7 !important; }
+[data-testid="stSidebar"] .stSelectbox > div > div {
+    background: #161b27 !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+}
+.stSelectbox > div > div {
+    background: #161b27 !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+}
+.stTextInput > div > div input {
+    background: #161b27 !important;
+    border-color: rgba(255,255,255,0.08) !important;
+    border-radius: 8px !important;
+    color: #edf2f7 !important;
+}
+.stAlert {
+    background: #161b27 !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+    border-radius: 10px !important;
+}
+.stButton > button {
+    background: transparent !important;
+    border: 1px solid rgba(99,179,237,0.35) !important;
+    color: #63b3ed !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.06em !important;
+    border-radius: 8px !important;
+}
+.stButton > button:hover { background: rgba(99,179,237,0.08) !important; }
+.stDownloadButton > button {
+    background: linear-gradient(135deg, #63b3ed, #4fd1c5) !important;
+    color: #0a0d12 !important;
+    border: none !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 0.04em !important;
+}
+[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+.live-dot { animation: pulse 2s infinite; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0a0d12; }
+::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 2px; }
 </style>
 """, unsafe_allow_html=True)
 
-def ensure_data():
-    db_path = "database/healthcare.db"
-    
-    if not os.path.exists(db_path):
-        st.warning("⚠️ No database found. Running pipeline...")
-        try:
-            subprocess.run(["python", "main.py"], check=True)
-            st.success("✅ Data pipeline executed successfully!")
-        except Exception as e:
-            st.error(f"❌ Pipeline failed: {e}")
+# ─────────────────────────────────────────────────────────────────────────────
+# DESIGN TOKENS
+# ─────────────────────────────────────────────────────────────────────────────
+C_BG     = "#0a0d12"
+C_CARD   = "#111520"
+C_SUBTLE = "#161b27"
+C_BORDER = "rgba(255,255,255,0.06)"
+C_TEXT   = "#edf2f7"
+C_SEC    = "#a0aec0"
+C_MUTED  = "#4a5568"
+C_TEAL   = "#63b3ed"
+C_MINT   = "#4fd1c5"
+C_AMBER  = "#f6ad55"
+C_VIOLET = "#b794f4"
+C_ROSE   = "#fc8181"
 
+TEAL_SCALE   = [[0, "#1a3a4a"], [0.5, "#2c7a99"], [1, C_TEAL]]
+MINT_SCALE   = [[0, "#1a4040"], [0.5, "#2c9999"], [1, C_MINT]]
+
+BASE_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="DM Sans", color=C_SEC, size=11),
+    title_font=dict(family="DM Serif Display", color=C_TEXT, size=15),
+    xaxis=dict(gridcolor="rgba(255,255,255,0.04)", linecolor="rgba(255,255,255,0.05)", tickcolor="rgba(255,255,255,0.04)"),
+    yaxis=dict(gridcolor="rgba(255,255,255,0.04)", linecolor="rgba(255,255,255,0.05)", tickcolor="rgba(255,255,255,0.04)"),
+    margin=dict(l=20, r=20, t=52, b=20),
+    hoverlabel=dict(bgcolor="#161b27", bordercolor="rgba(255,255,255,0.1)", font=dict(color=C_TEXT)),
+    legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor=C_BORDER),
+)
+
+def apply_layout(fig, **kw):
+    fig.update_layout(**{**BASE_LAYOUT, **kw})
+    return fig
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HTML HELPERS  (all inline styles — never reference CSS classes)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _div(style, content):
+    return f'<div style="{style}">{content}</div>'
+
+def insight_row(label, value, color=None):
+    color = color or C_TEAL
+    return (
+        f'<div style="display:flex;justify-content:space-between;align-items:center;'
+        f'padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:.82rem;">'
+        f'<span style="color:{C_SEC};">{label}</span>'
+        f'<span style="font-family:DM Mono,monospace;font-size:.8rem;color:{color};">{value}</span>'
+        f'</div>'
+    )
+
+def card(content, extra_style=""):
+    return (
+        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};border-radius:14px;'
+        f'padding:1.4rem 1.5rem;{extra_style}">{content}</div>'
+    )
+
+def card_header(title, dot_color):
+    return (
+        f'<div style="font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;'
+        f'color:{C_MUTED};margin-bottom:1rem;display:flex;align-items:center;gap:6px;">'
+        f'<div style="width:5px;height:5px;border-radius:50%;background:{dot_color};flex-shrink:0;"></div>'
+        f'{title}</div>'
+    )
+
+def chart_subtitle(text):
+    return (
+        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};border-radius:14px;'
+        f'padding:1.2rem 1.4rem 0.3rem;">'
+        f'<div style="font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;color:{C_MUTED};">'
+        f'{text}</div></div>'
+    )
+
+def section_header(text):
+    st.markdown(
+        f'<div style="display:flex;align-items:center;gap:12px;margin:2rem 0 1rem;">'
+        f'<span style="font-family:DM Serif Display,serif;font-size:1.2rem;color:{C_TEXT};white-space:nowrap;">'
+        f'{text}</span>'
+        f'<div style="flex:1;height:1px;background:{C_BORDER};"></div></div>',
+        unsafe_allow_html=True
+    )
+
+def sidebar_label(text):
+    st.markdown(
+        f'<div style="font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;'
+        f'color:{C_MUTED};padding:.5rem 0 .2rem;">{text}</div>',
+        unsafe_allow_html=True
+    )
+
+def sidebar_divider():
+    st.markdown(
+        f'<hr style="border:none;border-top:1px solid {C_BORDER};margin:.6rem 0;">',
+        unsafe_allow_html=True
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATA
+# ─────────────────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600)
 def load_data():
-    """Load data from database with caching"""
     try:
         df = query_database()
-        if df is None or len(df) == 0:
-            return None
-        return df
+        return df if df is not None and len(df) > 0 else None
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return None
 
+# ─────────────────────────────────────────────────────────────────────────────
+# KPI CARDS
+# ─────────────────────────────────────────────────────────────────────────────
+
 def create_kpi_cards(df):
-    """Create KPI metric cards"""
-    # Calculate metrics
-    total_patients = df['patient_id'].nunique() if 'patient_id' in df.columns else len(df)
-    total_revenue = df['amount'].sum() if 'amount' in df.columns else 0
-    avg_cost = df['amount'].mean() if 'amount' in df.columns else 0
-    
-    # Treatment count
-    treatment_counts = df['treatment_type'].value_counts() if 'treatment_type' in df.columns else pd.Series()
-    most_common = treatment_counts.index[0] if len(treatment_counts) > 0 else "N/A"
-    
-    # Completion rate
-    if 'status' in df.columns:
-        completed = len(df[df['status'] == 'Completed'])
-        completion_rate = (completed / len(df)) * 100 if len(df) > 0 else 0
-    else:
-        completion_rate = 0
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-icon">👥</div>
-                <div class="kpi-value">{total_patients:,}</div>
-                <div class="kpi-label">Total Patients</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-icon">💰</div>
-                <div class="kpi-value">${total_revenue:,.0f}</div>
-                <div class="kpi-label">Total Revenue</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-icon">📊</div>
-                <div class="kpi-value">${avg_cost:,.0f}</div>
-                <div class="kpi-label">Average Cost</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown(f"""
-            <div class="kpi-card">
-                <div class="kpi-icon">🏆</div>
-                <div class="kpi-value" style="font-size:1.2rem">{most_common[:20]}</div>
-                <div class="kpi-label">Most Common</div>
-            </div>
-        """, unsafe_allow_html=True)
-    
-    # Completion rate progress bar
-    st.markdown(f"""
-        <div class="progress-container">
-            <div class="progress-bar" style="width: {completion_rate}%">
-                Appointment Completion: {completion_rate:.1f}%
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    n_patients  = df["patient_id"].nunique() if "patient_id" in df.columns else len(df)
+    revenue     = df["amount"].sum()  if "amount" in df.columns else 0
+    avg_cost    = df["amount"].mean() if "amount" in df.columns else 0
+    tc          = df["treatment_type"].value_counts() if "treatment_type" in df.columns else pd.Series()
+    top_tx      = str(tc.index[0])[:22] if len(tc) else "—"
+    completion  = 0.0
+    if "status" in df.columns and len(df):
+        completion = len(df[df["status"] == "Completed"]) / len(df) * 100
 
-def create_treatment_chart(df):
-    """Create treatment distribution chart"""
-    if 'treatment_type' not in df.columns:
-        return None
-    
-    treatment_counts = df['treatment_type'].value_counts().head(10).reset_index()
-    treatment_counts.columns = ['Treatment', 'Count']
-    
-    fig = go.Figure(data=[go.Bar(
-        x=treatment_counts['Treatment'],
-        y=treatment_counts['Count'],
-        marker=dict(
-            color=treatment_counts['Count'],
-            colorscale='Viridis',
-            showscale=True,
-            colorbar=dict(title="Count")
-        ),
-        text=treatment_counts['Count'],
-        textposition='outside'
-    )])
-    
-    fig.update_layout(
-        title="Treatment Distribution",
-        xaxis_title="Treatment Type",
-        yaxis_title="Number of Patients",
-        height=400,
-        showlegend=False,
-        xaxis_tickangle=45
+    kpi_data = [
+        (C_TEAL,   f"{n_patients:,}",   "Total Patients",     "↑ Active cohort"),
+        (C_MINT,   f"${revenue:,.0f}",  "Total Revenue",      "Gross billings"),
+        (C_AMBER,  f"${avg_cost:,.0f}", "Avg Treatment Cost", "Per encounter"),
+        (C_VIOLET, top_tx,              "Top Treatment",      "By volume"),
+    ]
+
+    cols = st.columns(4)
+    for col, (color, value, label, delta) in zip(cols, kpi_data):
+        with col:
+            st.markdown(
+                f'<div style="background:{C_CARD};border:1px solid {C_BORDER};border-radius:14px;padding:1.4rem 1.5rem;">'
+                f'<div style="width:3px;height:36px;border-radius:2px;background:{color};margin-bottom:1rem;"></div>'
+                f'<div style="font-family:DM Serif Display,serif;font-size:2rem;line-height:1;margin-bottom:.3rem;color:{C_TEXT};">{value}</div>'
+                f'<div style="font-size:.72rem;color:{C_MUTED};letter-spacing:.06em;text-transform:uppercase;">{label}</div>'
+                f'<div style="font-family:DM Mono,monospace;font-size:.72rem;margin-top:.6rem;color:{color};">{delta}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
+    pct = f"{completion:.1f}"
+    st.markdown(
+        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};border-radius:10px;'
+        f'padding:1rem 1.5rem;margin:1rem 0 2rem;display:flex;align-items:center;gap:1.2rem;">'
+        f'<div style="font-size:.72rem;color:{C_MUTED};letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;min-width:200px;">Appointment Completion</div>'
+        f'<div style="flex:1;height:4px;background:{C_SUBTLE};border-radius:2px;overflow:hidden;">'
+        f'<div style="height:100%;width:{pct}%;background:linear-gradient(90deg,{C_TEAL},{C_MINT});border-radius:2px;"></div></div>'
+        f'<div style="font-family:DM Mono,monospace;font-size:.8rem;color:{C_TEAL};min-width:40px;text-align:right;">{pct}%</div>'
+        f'</div>',
+        unsafe_allow_html=True
     )
-    
-    return fig
 
-def create_monthly_revenue_chart(df):
-    """Create monthly revenue chart"""
-    if 'Month' not in df.columns or 'amount' not in df.columns:
+# ─────────────────────────────────────────────────────────────────────────────
+# CHARTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def fig_treatment(df):
+    if "treatment_type" not in df.columns:
         return None
-    
-    monthly = df.groupby('Month')['amount'].sum().reset_index()
-    monthly = monthly.sort_values('Month')
-    
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter(
-        x=monthly['Month'],
-        y=monthly['amount'],
-        mode='lines+markers',
-        name='Revenue',
-        line=dict(width=3, color='#667eea'),
-        marker=dict(size=8, color='#764ba2'),
-        fill='tozeroy',
-        fillcolor='rgba(102, 126, 234, 0.2)'
+    tc = df["treatment_type"].value_counts().head(10).reset_index()
+    tc.columns = ["Treatment", "Count"]
+    fig = go.Figure(go.Bar(
+        x=tc["Treatment"], y=tc["Count"],
+        marker=dict(color=tc["Count"], colorscale=TEAL_SCALE, showscale=False,
+                    line=dict(color="rgba(0,0,0,0)", width=0)),
+        text=tc["Count"], textposition="outside", textfont=dict(color=C_SEC, size=10),
     ))
-    
-    fig.update_layout(
-        title="Monthly Revenue Trend",
-        xaxis_title="Month",
-        yaxis_title="Revenue ($)",
-        height=400
-    )
-    
+    return apply_layout(fig, title="Treatment Volume", xaxis_tickangle=30, height=360)
+
+def fig_revenue(df):
+    if "Month" not in df.columns or "amount" not in df.columns:
+        return None
+    m = df.groupby("Month")["amount"].sum().reset_index().sort_values("Month")
+    fig = go.Figure(go.Scatter(
+        x=m["Month"], y=m["amount"], mode="lines+markers",
+        line=dict(width=2.5, color=C_TEAL),
+        marker=dict(size=7, color=C_MINT, line=dict(color=C_BG, width=2)),
+        fill="tozeroy", fillcolor="rgba(99,179,237,0.07)",
+    ))
+    apply_layout(fig, title="Monthly Revenue Trend", height=360)
+    fig.update_yaxes(tickprefix="$")
     return fig
 
-def create_payment_chart(df):
-    """Create payment status chart"""
-    if 'payment_status' in df.columns:
-        status_counts = df['payment_status'].value_counts()
-        
-        colors = {
-            'Paid': '#28a745',
-            'Pending': '#ffc107',
-            'Failed': '#dc3545'
-        }
-        
-        fig = go.Figure(data=[go.Pie(
-            labels=status_counts.index,
-            values=status_counts.values,
-            hole=0.3,
-            marker=dict(colors=[colors.get(s, '#667eea') for s in status_counts.index]),
-            textinfo='label+percent'
-        )])
-        
-        fig.update_layout(title="Payment Status Distribution", height=400)
-        return fig
-    elif 'status' in df.columns:
-        status_counts = df['status'].value_counts()
-        
-        fig = go.Figure(data=[go.Bar(
-            x=status_counts.index,
-            y=status_counts.values,
-            marker=dict(color=['#28a745', '#17a2b8', '#dc3545', '#ffc107']),
-            text=status_counts.values,
-            textposition='auto'
-        )])
-        
-        fig.update_layout(
-            title="Appointment Status",
-            xaxis_title="Status",
-            yaxis_title="Count",
-            height=400
-        )
-        return fig
-    
-    return None
-
-def create_gender_chart(df):
-    """Create gender distribution chart"""
-    if 'gender' not in df.columns:
+def fig_payment(df):
+    PAL = {"Paid": C_MINT, "Pending": C_AMBER, "Failed": C_ROSE}
+    if "payment_status" in df.columns:
+        sc = df["payment_status"].value_counts()
+        colors = [PAL.get(str(s), C_VIOLET) for s in sc.index]
+    elif "status" in df.columns:
+        sc = df["status"].value_counts()
+        colors = [C_MINT, C_TEAL, C_ROSE, C_AMBER][: len(sc)]
+    else:
         return None
-    
-    gender_counts = df['gender'].value_counts()
-    
-    fig = go.Figure(data=[go.Pie(
-        labels=gender_counts.index,
-        values=gender_counts.values,
-        hole=0.3,
-        marker=dict(colors=['#667eea', '#764ba2']),
-        textinfo='label+percent'
-    )])
-    
-    fig.update_layout(title="Gender Distribution", height=400)
-    return fig
+    fig = go.Figure(go.Pie(
+        labels=sc.index, values=sc.values, hole=0.55,
+        marker=dict(colors=colors, line=dict(color=C_BG, width=2)),
+        textinfo="percent", textfont=dict(size=11),
+    ))
+    fig.add_annotation(text="Status", x=0.5, y=0.5, showarrow=False,
+                       font=dict(size=11, color=C_MUTED))
+    return apply_layout(fig, title="Payment Distribution", height=360,
+                        legend=dict(orientation="v", x=1, y=0.5, bgcolor="rgba(0,0,0,0)"))
 
-def create_age_chart(df):
-    """Create age distribution chart"""
-    if 'Age' not in df.columns:
+def fig_gender(df):
+    if "gender" not in df.columns:
         return None
-    
-    fig = go.Figure(data=[go.Histogram(
-        x=df['Age'],
-        nbinsx=20,
-        marker=dict(color='#667eea', line=dict(color='white', width=1))
-    )])
-    
-    mean_age = df['Age'].mean()
-    fig.add_vline(
-        x=mean_age,
-        line_dash="dash",
-        line_color="red",
-        annotation_text=f"Mean: {mean_age:.1f}",
-        annotation_position="top"
-    )
-    
-    fig.update_layout(
-        title="Age Distribution of Patients",
-        xaxis_title="Age (Years)",
-        yaxis_title="Number of Patients",
-        height=400
-    )
-    
-    return fig
+    gc = df["gender"].value_counts()
+    fig = go.Figure(go.Pie(
+        labels=gc.index, values=gc.values, hole=0.55,
+        marker=dict(colors=[C_TEAL, C_VIOLET, C_MINT], line=dict(color=C_BG, width=2)),
+        textinfo="percent", textfont=dict(size=11),
+    ))
+    fig.add_annotation(text="Gender", x=0.5, y=0.5, showarrow=False,
+                       font=dict(size=11, color=C_MUTED))
+    return apply_layout(fig, title="Gender Distribution", height=360)
 
-def create_doctor_chart(df):
-    """Create doctor performance chart"""
-    if 'amount' not in df.columns:
+def fig_age(df):
+    if "Age" not in df.columns:
         return None
-    
-    # Find doctor name column
-    doctor_col = None
+    mu = df["Age"].mean()
+    fig = go.Figure(go.Histogram(
+        x=df["Age"], nbinsx=22,
+        marker=dict(color=C_TEAL, opacity=0.8, line=dict(color=C_BG, width=0.5)),
+    ))
+    fig.add_vline(x=mu, line_dash="dot", line_color=C_AMBER, line_width=1.5,
+                  annotation_text=f"μ {mu:.1f}",
+                  annotation_font=dict(color=C_AMBER, size=11))
+    return apply_layout(fig, title="Age Distribution", height=360)
+
+def fig_doctors(df):
+    if "amount" not in df.columns:
+        return None
+    dcol = None
     for col in df.columns:
-        if 'doctor' in col.lower() and ('name' in col.lower() or 'first_name' in col.lower()):
-            doctor_col = col
-            break
-    
-    if not doctor_col and 'first_name' in df.columns and 'last_name' in df.columns:
-        df['doctor_name'] = df['first_name'] + ' ' + df['last_name']
-        doctor_col = 'doctor_name'
-    
-    if not doctor_col:
+        if "doctor" in col.lower() and ("name" in col.lower() or "first_name" in col.lower()):
+            dcol = col; break
+    if not dcol and "first_name" in df.columns and "last_name" in df.columns:
+        df = df.copy()
+        df["_doc"] = df["first_name"] + " " + df["last_name"]
+        dcol = "_doc"
+    if not dcol:
         return None
-    
-    doctor_revenue = df.groupby(doctor_col)['amount'].sum().sort_values(ascending=True).tail(10)
-    
-    fig = go.Figure(data=[go.Bar(
-        y=doctor_revenue.index,
-        x=doctor_revenue.values,
-        orientation='h',
-        marker=dict(color=doctor_revenue.values, colorscale='Plasma'),
-        text=doctor_revenue.values,
-        textposition='outside'
-    )])
-    
-    fig.update_layout(
-        title="Top 10 Doctors by Revenue",
-        xaxis_title="Revenue ($)",
-        yaxis_title="Doctor",
-        height=450,
-        margin=dict(l=120)
-    )
-    
+    rev = df.groupby(dcol)["amount"].sum().sort_values(ascending=True).tail(10)
+    fig = go.Figure(go.Bar(
+        y=rev.index, x=rev.values, orientation="h",
+        marker=dict(color=rev.values, colorscale=MINT_SCALE, showscale=False,
+                    line=dict(color="rgba(0,0,0,0)", width=0)),
+        text=[f"${v:,.0f}" for v in rev.values],
+        textposition="outside", textfont=dict(color=C_SEC, size=10),
+    ))
+    apply_layout(fig, title="Top 10 Physicians by Revenue", height=400,
+                 margin=dict(l=130, r=40, t=52, b=20))
+    fig.update_xaxes(tickprefix="$")
     return fig
 
-def create_cost_chart(df):
-    """Create treatment cost distribution chart"""
-    if 'treatment_type' not in df.columns or 'amount' not in df.columns:
+def fig_cost_dist(df):
+    if "treatment_type" not in df.columns or "amount" not in df.columns:
         return None
-    
-    top_treatments = df['treatment_type'].value_counts().head(8).index
-    
+    top = df["treatment_type"].value_counts().head(8).index
+    palette = [C_TEAL, C_MINT, C_VIOLET, C_AMBER, C_ROSE, "#68d391", "#76e4f7", "#fbd38d"]
     fig = go.Figure()
-    for treatment in top_treatments:
-        treatment_data = df[df['treatment_type'] == treatment]['amount']
+    for i, t in enumerate(top):
+        c = palette[i % len(palette)]
+        r, g, b = int(c[1:3], 16), int(c[3:5], 16), int(c[5:7], 16)
         fig.add_trace(go.Box(
-            y=treatment_data,
-            name=treatment,
-            boxmean='sd',
-            marker_color='#667eea'
+            y=df[df["treatment_type"] == t]["amount"], name=t,
+            boxmean="sd", marker_color=c, line_color=c,
+            fillcolor=f"rgba({r},{g},{b},0.12)",
         ))
-    
-    fig.update_layout(
-        title="Treatment Cost Distribution by Type",
-        yaxis_title="Cost ($)",
-        xaxis_title="Treatment Type",
-        height=450,
-        showlegend=False,
-        xaxis_tickangle=45
-    )
-    
+    apply_layout(fig, title="Cost Distribution by Treatment", height=420,
+                 showlegend=False,
+                 xaxis=dict(**BASE_LAYOUT["xaxis"], tickangle=30))
+    fig.update_yaxes(tickprefix="$")
     return fig
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CHART COLUMN HELPER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def render_chart(col, subtitle, make_fig, df):
+    with col:
+        st.markdown(chart_subtitle(subtitle), unsafe_allow_html=True)
+        f = make_fig(df)
+        if f:
+            st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SIDEBAR
+# ─────────────────────────────────────────────────────────────────────────────
 
 def create_sidebar_filters(df):
-    """Create sidebar filters"""
     with st.sidebar:
-        st.markdown("""
-            <div class="sidebar-header">
-                <h3>🏥 Healthcare Analytics</h3>
-                <p>Interactive Dashboard</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        filtered_df = df.copy()
-        
-        # Date filter
-        date_col = None
-        for col in ['appointment_date', 'date', 'bill_date', 'treatment_date']:
-            if col in df.columns:
-                date_col = col
-                break
-        
-        if date_col:
-            st.markdown("### 📅 Date Range")
-            min_date = pd.to_datetime(df[date_col]).min()
-            max_date = pd.to_datetime(df[date_col]).max()
-            
-            date_range = st.date_input(
-                "Select Range",
-                [min_date, max_date],
-                min_value=min_date,
-                max_value=max_date
-            )
-            
-            if len(date_range) == 2:
-                mask = (pd.to_datetime(df[date_col]) >= pd.to_datetime(date_range[0])) & \
-                       (pd.to_datetime(df[date_col]) <= pd.to_datetime(date_range[1]))
-                filtered_df = df[mask]
-            
-            st.markdown("---")
-        
-        # Treatment filter
-        if 'treatment_type' in df.columns:
-            st.markdown("### 💊 Treatment Type")
-            treatments = ['All'] + sorted(df['treatment_type'].dropna().unique().tolist())
-            selected = st.selectbox("Select Treatment", treatments)
-            if selected != 'All':
-                filtered_df = filtered_df[filtered_df['treatment_type'] == selected]
-            st.markdown("---")
-        
-        # Status filter
-        if 'status' in df.columns:
-            st.markdown("### 📌 Appointment Status")
-            statuses = ['All'] + sorted(df['status'].dropna().unique().tolist())
-            selected = st.selectbox("Select Status", statuses)
-            if selected != 'All':
-                filtered_df = filtered_df[filtered_df['status'] == selected]
-            st.markdown("---")
-        
-        # Payment filter
-        if 'payment_status' in df.columns:
-            st.markdown("### 💳 Payment Status")
-            payments = ['All'] + sorted(df['payment_status'].dropna().unique().tolist())
-            selected = st.selectbox("Select Payment Status", payments)
-            if selected != 'All':
-                filtered_df = filtered_df[filtered_df['payment_status'] == selected]
-            st.markdown("---")
-        
-        # Cost filter
-        if 'amount' in df.columns:
-            st.markdown("### 💰 Cost Range")
-            min_cost = float(df['amount'].min())
-            max_cost = float(df['amount'].max())
-            
-            cost_range = st.slider(
-                "Select Range ($)",
-                min_cost,
-                max_cost,
-                (min_cost, max_cost),
-                format="$%.0f"
-            )
-            
-            filtered_df = filtered_df[(filtered_df['amount'] >= cost_range[0]) & 
-                                      (filtered_df['amount'] <= cost_range[1])]
-            st.markdown("---")
-        
-        # Statistics summary
-        st.markdown("### 📊 Current View")
-        total_records = len(filtered_df)
-        total_patients = filtered_df['patient_id'].nunique() if 'patient_id' in filtered_df.columns else 'N/A'
-        total_revenue = filtered_df['amount'].sum() if 'amount' in filtered_df.columns else 0
-        
-        st.info(f"""
-        **Records:** {total_records:,}
-        **Patients:** {total_patients}
-        **Revenue:** ${total_revenue:,.2f}
-        """)
-        
-        # Reset button
-        if st.button("🔄 Reset All Filters", use_container_width=True):
+        # Brand
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:10px;padding:1.4rem 1.2rem 1rem;">'
+            f'<div style="width:36px;height:36px;flex-shrink:0;'
+            f'background:linear-gradient(135deg,{C_TEAL},{C_MINT});'
+            f'clip-path:polygon(50% 0%,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%);"></div>'
+            f'<div>'
+            f'<div style="font-family:DM Serif Display,serif;font-size:1.2rem;">Medic</div>'
+            f'<div style="font-size:.65rem;color:{C_MUTED};letter-spacing:.1em;text-transform:uppercase;">Analytics Platform</div>'
+            f'</div></div>',
+            unsafe_allow_html=True
+        )
+        sidebar_divider()
+
+        fdf = df.copy()
+
+        # Date
+        dcol = next((c for c in ["appointment_date","date","bill_date","treatment_date"] if c in df.columns), None)
+        if dcol:
+            sidebar_label("Date Range")
+            mn = pd.to_datetime(df[dcol]).min()
+            mx = pd.to_datetime(df[dcol]).max()
+            dr = st.date_input("", [mn, mx], min_value=mn, max_value=mx, label_visibility="collapsed")
+            if len(dr) == 2:
+                mask = (pd.to_datetime(df[dcol]) >= pd.to_datetime(dr[0])) & \
+                       (pd.to_datetime(df[dcol]) <= pd.to_datetime(dr[1]))
+                fdf = df[mask]
+            sidebar_divider()
+
+        if "treatment_type" in df.columns:
+            sidebar_label("Treatment")
+            opts = ["All"] + sorted(df["treatment_type"].dropna().unique().tolist())
+            sel = st.selectbox("", opts, label_visibility="collapsed", key="sb_treat")
+            if sel != "All":
+                fdf = fdf[fdf["treatment_type"] == sel]
+            sidebar_divider()
+
+        if "status" in df.columns:
+            sidebar_label("Appointment Status")
+            opts = ["All"] + sorted(df["status"].dropna().unique().tolist())
+            sel = st.selectbox("", opts, label_visibility="collapsed", key="sb_status")
+            if sel != "All":
+                fdf = fdf[fdf["status"] == sel]
+            sidebar_divider()
+
+        if "payment_status" in df.columns:
+            sidebar_label("Payment Status")
+            opts = ["All"] + sorted(df["payment_status"].dropna().unique().tolist())
+            sel = st.selectbox("", opts, label_visibility="collapsed", key="sb_pay")
+            if sel != "All":
+                fdf = fdf[fdf["payment_status"] == sel]
+            sidebar_divider()
+
+        if "amount" in df.columns:
+            sidebar_label("Cost Range")
+            lo, hi = float(df["amount"].min()), float(df["amount"].max())
+            rng = st.slider("", lo, hi, (lo, hi), format="$%.0f", label_visibility="collapsed")
+            fdf = fdf[(fdf["amount"] >= rng[0]) & (fdf["amount"] <= rng[1])]
+            sidebar_divider()
+
+        # Mini stats — build entirely as one safe string
+        total_r = fdf["amount"].sum()  if "amount"     in fdf.columns else 0
+        pt      = fdf["patient_id"].nunique() if "patient_id" in fdf.columns else "—"
+        n       = len(fdf)
+
+        st.markdown(
+            f'<div style="padding:.9rem 1.1rem;background:rgba(99,179,237,0.05);border-radius:10px;'
+            f'border:1px solid rgba(99,179,237,0.1);">'
+            f'<div style="font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:{C_MUTED};margin-bottom:8px;">Current View</div>'
+            f'<div style="font-size:.78rem;line-height:2;">'
+            f'Records<span style="color:{C_TEAL};font-family:DM Mono,monospace;float:right;">{n:,}</span><br>'
+            f'Patients<span style="color:{C_TEAL};font-family:DM Mono,monospace;float:right;">{pt}</span><br>'
+            f'Revenue<span style="color:{C_MINT};font-family:DM Mono,monospace;float:right;">${total_r:,.0f}</span>'
+            f'</div></div>',
+            unsafe_allow_html=True
+        )
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("↺  Reset Filters", use_container_width=True):
             st.rerun()
-        
-        return filtered_df
+
+    return fdf
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INSIGHTS
+# ─────────────────────────────────────────────────────────────────────────────
 
 def display_insights(df):
-    """Display key insights"""
-    st.markdown("### 💡 Key Insights")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if 'amount' in df.columns:
-            st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-            st.markdown("**💰 Revenue Insights**")
-            st.metric("Total Revenue", f"${df['amount'].sum():,.2f}")
-            st.metric("Average Cost", f"${df['amount'].mean():,.2f}")
-            st.metric("Median Cost", f"${df['amount'].median():,.2f}")
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-        st.markdown("**👥 Patient Insights**")
-        
-        if 'gender' in df.columns:
-            for gender, count in df['gender'].value_counts().items():
-                pct = (count / len(df)) * 100
-                st.write(f"{gender}: {count:,} ({pct:.1f}%)")
-        
-        if 'Age' in df.columns:
-            st.write(f"**Avg Age:** {df['Age'].mean():.1f} years")
-            st.write(f"**Age Range:** {df['Age'].min():.0f} - {df['Age'].max():.0f}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col3:
-        if 'treatment_type' in df.columns:
-            st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-            st.markdown("**💊 Treatment Insights**")
-            
-            most_common = df['treatment_type'].mode()[0] if len(df['treatment_type'].mode()) > 0 else "N/A"
-            st.write(f"**Most Common:** {most_common}")
-            st.write(f"**Unique Treatments:** {df['treatment_type'].nunique()}")
-            
-            if 'amount' in df.columns:
-                top_revenue = df.groupby('treatment_type')['amount'].sum().idxmax()
-                st.write(f"**Top Revenue:** {top_revenue}")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+    # Build lists of row strings, then join — never embed inside a wrapping f-string
+    rev, ptr, trt = [], [], []
+
+    if "amount" in df.columns:
+        rev = [
+            insight_row("Total Revenue",   f"${df['amount'].sum():,.0f}",    C_TEAL),
+            insight_row("Average Cost",    f"${df['amount'].mean():,.0f}",   C_TEAL),
+            insight_row("Median Cost",     f"${df['amount'].median():,.0f}", C_TEAL),
+            insight_row("Max Single Bill", f"${df['amount'].max():,.0f}",    C_AMBER),
+        ]
+
+    if "gender" in df.columns:
+        for g, c in df["gender"].value_counts().items():
+            ptr.append(insight_row(str(g), f"{c:,}  ({c/len(df)*100:.1f}%)", C_VIOLET))
+    if "Age" in df.columns:
+        ptr += [
+            insight_row("Avg Age",   f"{df['Age'].mean():.1f} yrs",                    C_VIOLET),
+            insight_row("Age Range", f"{df['Age'].min():.0f}–{df['Age'].max():.0f}",   C_VIOLET),
+        ]
+
+    if "treatment_type" in df.columns:
+        mode = df["treatment_type"].mode()
+        mc = str(mode.iloc[0]) if not mode.empty else "—"
+        trt.append(insight_row("Most Common",  mc,                                 C_MINT))
+        trt.append(insight_row("Unique Types", str(df["treatment_type"].nunique()), C_MINT))
+        if "amount" in df.columns:
+            top = str(df.groupby("treatment_type")["amount"].sum().idxmax())
+            trt.append(insight_row("Top Revenue", top, C_MINT))
+
+    def _card(dot, title, rows):
+        return card(card_header(title, dot) + "".join(rows))
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(_card(C_TEAL,   "Revenue Insights",   rev), unsafe_allow_html=True)
+    with c2:
+        st.markdown(_card(C_VIOLET, "Patient Insights",   ptr), unsafe_allow_html=True)
+    with c3:
+        st.markdown(_card(C_MINT,   "Treatment Insights", trt), unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAIN
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    """Main dashboard function"""
-    
-    # Header
-    st.markdown("""
-        <div class="main-header">
-            <h1>🏥 Healthcare Analytics Dashboard</h1>
-            <p>Comprehensive Patient, Treatment & Financial Analytics</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Load data
-    with st.spinner("Loading data..."):
-        df = load_data()
-    
-    if df is None or len(df) == 0:
-        st.warning("⚠️ No data found. Please run the pipeline first: `python main.py`")
-        
-        with st.expander("📖 How to get started"):
-            st.markdown("""
-                1. Place your CSV files in the `data/` folder
-                2. Run: `python main.py`
-                3. Refresh this dashboard
-            """)
-        return
-    
-    # Apply filters
-    filtered_df = create_sidebar_filters(df)
-    
-    # KPI Cards
-    create_kpi_cards(filtered_df)
-    
-    st.markdown("---")
-    
-    # Row 1: Treatment and Revenue Charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        with st.container():
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            treatment_fig = create_treatment_chart(filtered_df)
-            if treatment_fig:
-                st.plotly_chart(treatment_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        with st.container():
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            revenue_fig = create_monthly_revenue_chart(filtered_df)
-            if revenue_fig:
-                st.plotly_chart(revenue_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Row 2: Payment and Gender Charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        with st.container():
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            payment_fig = create_payment_chart(filtered_df)
-            if payment_fig:
-                st.plotly_chart(payment_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        with st.container():
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            gender_fig = create_gender_chart(filtered_df)
-            if gender_fig:
-                st.plotly_chart(gender_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Row 3: Age and Doctor Charts
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        with st.container():
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            age_fig = create_age_chart(filtered_df)
-            if age_fig:
-                st.plotly_chart(age_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col2:
-        with st.container():
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            doctor_fig = create_doctor_chart(filtered_df)
-            if doctor_fig:
-                st.plotly_chart(doctor_fig, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Row 4: Cost Distribution Chart
-    with st.container():
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        cost_fig = create_cost_chart(filtered_df)
-        if cost_fig:
-            st.plotly_chart(cost_fig, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Insights Section
-    st.markdown("---")
-    display_insights(filtered_df)
-    
-    # Data Table Section
-    st.markdown("---")
-    st.markdown("### 📋 Data Preview")
-    
-    # Search functionality
-    search_col = st.selectbox("Search column:", filtered_df.columns)
-    search_term = st.text_input(f"Search in {search_col}:", placeholder="Type to search...")
-    
-    if search_term:
-        mask = filtered_df[search_col].astype(str).str.contains(search_term, case=False, na=False)
-        display_df = filtered_df[mask]
-        st.success(f"Found {len(display_df)} records")
-    else:
-        display_df = filtered_df
-    
-    # Pagination
-    page_size = st.selectbox("Rows per page:", [10, 25, 50, 100])
-    total_pages = max(1, (len(display_df) + page_size - 1) // page_size)
-    page_number = st.number_input("Page", min_value=1, max_value=total_pages, value=1)
-    
-    start_idx = (page_number - 1) * page_size
-    end_idx = start_idx + page_size
-    
-    st.dataframe(display_df.iloc[start_idx:end_idx], use_container_width=True)
-    
-    # Download button
-    csv = display_df.to_csv(index=False)
-    st.download_button(
-        label="📥 Download as CSV",
-        data=csv,
-        file_name=f"healthcare_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
+    now = datetime.now().strftime("%d %b %Y, %H:%M")
+
+    # ── Page header ───────────────────────────────────────────────────────────
+    st.markdown(
+        f'<div style="display:flex;align-items:flex-end;justify-content:space-between;'
+        f'margin-bottom:2.4rem;padding-bottom:1.4rem;border-bottom:1px solid {C_BORDER};">'
+
+        f'<div>'
+        f'<div style="font-family:DM Serif Display,serif;font-size:2.6rem;line-height:1.1;'
+        f'letter-spacing:-.02em;background:linear-gradient(120deg,{C_TEXT} 30%,{C_TEAL});'
+        f'-webkit-background-clip:text;-webkit-text-fill-color:transparent;">'
+        f'Healthcare Analytics</div>'
+        f'<div style="font-size:.78rem;color:{C_MUTED};letter-spacing:.07em;text-transform:uppercase;margin-top:.3rem;">'
+        f'Patient &middot; Treatment &middot; Financial Intelligence</div>'
+        f'</div>'
+
+        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};border-radius:8px;'
+        f'padding:.45rem .9rem;font-family:DM Mono,monospace;font-size:.74rem;color:{C_SEC};">'
+        f'<span class="live-dot" style="display:inline-block;width:6px;height:6px;border-radius:50%;'
+        f'background:{C_MINT};margin-right:7px;vertical-align:middle;"></span>'
+        f'Live &middot; {now}</div>'
+
+        f'</div>',
+        unsafe_allow_html=True
     )
-    
-    # Footer
-    st.markdown("""
-        <div class="footer">
-            <p>🏥 Healthcare Analytics Dashboard | Powered by Streamlit & Plotly</p>
-        </div>
-    """, unsafe_allow_html=True)
+
+    with st.spinner(""):
+        df = load_data()
+
+    if df is None or len(df) == 0:
+        st.warning("No data found. Run `python main.py` to populate the database.")
+        with st.expander("Getting started"):
+            st.markdown("1. Place CSV files in `data/`\n2. Run `python main.py`\n3. Refresh")
+        return
+
+    fdf = create_sidebar_filters(df)
+
+    create_kpi_cards(fdf)
+
+    # ── Volume & Revenue ──────────────────────────────────────────────────────
+    section_header("Volume &amp; Revenue")
+    c1, c2 = st.columns(2)
+    render_chart(c1, "By Treatment Type",  fig_treatment, fdf)
+    render_chart(c2, "Monthly Trend",      fig_revenue,   fdf)
+
+    # ── Demographics ──────────────────────────────────────────────────────────
+    section_header("Patient Demographics")
+    c1, c2, c3 = st.columns(3)
+    render_chart(c1, "Gender Split",   fig_gender,  fdf)
+    render_chart(c2, "Age Histogram",  fig_age,     fdf)
+    render_chart(c3, "Payment Status", fig_payment, fdf)
+
+    # ── Financial ─────────────────────────────────────────────────────────────
+    section_header("Financial Performance")
+    c1, c2 = st.columns(2)
+    render_chart(c1, "Physician Revenue Ranking", fig_doctors,   fdf)
+    render_chart(c2, "Cost Spread by Treatment",  fig_cost_dist, fdf)
+
+    # ── Insights ──────────────────────────────────────────────────────────────
+    section_header("Key Insights")
+    display_insights(fdf)
+
+    # ── Data Explorer ─────────────────────────────────────────────────────────
+    section_header("Data Explorer")
+    st.markdown(
+        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};border-radius:14px;padding:1.5rem;">',
+        unsafe_allow_html=True
+    )
+    sc1, sc2, sc3 = st.columns([2, 3, 1])
+    with sc1:
+        search_col = st.selectbox("Column", fdf.columns)
+    with sc2:
+        search_term = st.text_input("Search", placeholder=f"Filter by {search_col}…")
+    with sc3:
+        page_size = st.selectbox("Rows / page", [10, 25, 50, 100])
+
+    ddf = (
+        fdf[fdf[search_col].astype(str).str.contains(search_term, case=False, na=False)]
+        if search_term else fdf
+    )
+    total_pages = max(1, (len(ddf) + page_size - 1) // page_size)
+    page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1)
+    start = (page_num - 1) * page_size
+    st.dataframe(ddf.iloc[start: start + page_size], use_container_width=True, hide_index=True)
+    st.download_button(
+        "⬇  Export CSV",
+        data=ddf.to_csv(index=False),
+        file_name=f"healthcare_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    st.markdown(
+        f'<div style="display:flex;justify-content:space-between;align-items:center;'
+        f'margin-top:3rem;padding-top:1.5rem;border-top:1px solid {C_BORDER};'
+        f'font-size:.72rem;color:{C_MUTED};letter-spacing:.05em;">'
+        f'<div style="font-family:DM Serif Display,serif;font-size:.9rem;color:{C_SEC};">&#x2B22; Medic Analytics</div>'
+        f'<div>Powered by Streamlit &amp; Plotly &middot; {now}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+
 
 if __name__ == "__main__":
     main()
-
